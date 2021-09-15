@@ -32,13 +32,12 @@ class RandomStationaryStreamGenerator:
 
 
 class FoldingStationaryStreamGenerator:
-    def __init__(self, X, y, n_chunks=10, random_state=None):
+    def __init__(self, X, y, n_chunks=10):
         self.X = X
         self.y = y
         self.n_chunks = n_chunks
-        self.random_state = random_state
 
     def generate(self):
-        folding = StratifiedKFold(n_splits=self.n_chunks, random_state=self.random_state)
+        folding = StratifiedKFold(n_splits=self.n_chunks, shuffle=False)
         for _, ind in folding.split(self.X, self.y):
             yield self.X[ind], self.y[ind]
