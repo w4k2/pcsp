@@ -138,6 +138,6 @@ dmypy.json
 cython_debug/
 
 # Project artifacts
-data/
+data/**/
 foo.png
 bar.png

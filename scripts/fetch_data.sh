@@ -24,3 +24,9 @@ gdown "https://drive.google.com/uc?export=download&id=1QD4w-KwcFDGTC1bDAo3vr6uYJ
 unzip ${TMPFILE} -d "${DATA_DIR}"
 
 rm -v "$TMPFILE"
+
+# Sources:
+#   - [uea_ucr](http://www.timeseriesclassification.com/index.php)
+#   - [deric](https://github.com/deric/clustering-benchmark)
+#   - [cse](https://www.cse.fau.edu/~xqzhu/stream.html)
+#
