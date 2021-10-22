@@ -1,150 +1,155 @@
+import os.path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import time
 
 from sources.streams.chunk_generator import ChunkGenerator
-from sources.streams.blobs_generator import make_beta_blobs
-from sources.helpers.animation import FrameAnimaton
-from sources.algorithms.PCSkmeans import PCSKMeans
-from sources.algorithms.COPkmeans import COPKMeans
 from sources.helpers.constraints import make_constraints
 from sources.helpers.arff import load_arff_dataset
+from sources.streams.blobs_generator import make_beta_blobs
+from sources.helpers.preprocesing import prepare_X, prepare_y
+from sources.helpers.animation import FrameAnimaton
 
-from sklearn.cluster import MiniBatchKMeans, KMeans
+from sources.ckm.cop_kmeans import COPKMeans
+from sources.ckm.pcs_kmeans import PCSKMeans
+from sources.ckm.mini_batch.cop_kmeans import MiniBatchCOPKmeans
+
 from sklearn.metrics import adjusted_rand_score
-from sklearn.base import clone
-from sklearn.preprocessing import LabelEncoder
-from sklearn.decomposition import PCA
-
-import ecol
-
-from itertools import combinations
 
 from tqdm import tqdm
 
-CHUNK_SIZE = 100
-N_CHUNKS = 20
-C_RATIO = 0.2
+CHUNK_SIZE = 200
+R_N_CHUNKS = 50
+C_RATIO = 0.05
+MAX_CHUNKS = 30
 
 G = 5
-W = 2.5
+W = 1.5
 
-N_CLUSTERS = 24
 
-ESTIMATORS = [
-    # KMeans(n_clusters=N_CLUSTERS),
-    MiniBatchKMeans(n_clusters=N_CLUSTERS),
-    PCSKMeans(n_clusters=N_CLUSTERS),
-    COPKMeans(n_clusters=N_CLUSTERS),
-]
+def make_stream_gif(X, y, chunk_size, out_file="stream.gif"):
+    print(len(X))
+    print(chunk_size * MAX_CHUNKS)
 
-complexities = []
-scores = np.zeros((len(ESTIMATORS), N_CHUNKS))
+    n_samples = min(len(X), chunk_size * MAX_CHUNKS)
+    X = X[:n_samples]
+    y = y[:n_samples]
+
+    s = ChunkGenerator(X, y, chunk_size=chunk_size)
+    animation = FrameAnimaton()
+
+    # ax_lims = X.min() - 0.1, X.max() + 0.1
+
+    for i, (X_test, y_test) in enumerate(s):
+        if i > MAX_CHUNKS:
+            break
+
+        fig = plt.figure()
+        plt.title(f"{i}")
+
+        if X_test.shape[1] > 2:
+            print("Applying reduction")
+            from sklearn.manifold import Isomap as tranformation
+            X_test = tranformation(n_components=2).fit_transform(X_test, y)
+
+        plt.scatter(*X_test.T, c=y_test, s=2)
+        # plt.xlim(*ax_lims)
+        # plt.ylim(*ax_lims)
+        plt.tight_layout()
+        animation.add_frame(fig)
+        plt.close(fig)
+
+    animation.export(out_file)
+
 
 def main():
-    # X, y = make_beta_blobs([[0.5, 0], [-0.5, 0]], n_samples=CHUNK_SIZE * N_CHUNKS, random_state=100)
+    X, y = load_arff_dataset('data/cse/kddcup99.arff')
     # X, y = load_arff_dataset('data/cse/sensor.arff')
-    X, y = load_arff_dataset('data/cse/powersupply.arff')
+    # X, y = load_arff_dataset('data/cse/powersupply.arff')
+    # X, y = make_beta_blobs([[3.1, 0], [2.1, 0], [1.1, 0], [1.1, 1]], radius=[0.5, 0.5, 0.5, 0.5],
+    #                        n_samples=CHUNK_SIZE * R_N_CHUNKS, random_state=100)
 
-    print(f"n_clusters: {len(np.unique(y))}")
+    X = prepare_X(X)
+    y = prepare_y(y)
 
-    X = X.astype(float)
-    y = LabelEncoder().fit_transform(y)
-    # X = PCA(n_components=2).fit_transform(X, y)
+    print("Preparing animation")
+    make_stream_gif(X, y, CHUNK_SIZE, "animation.gif")
+    exit()
 
-    s = ChunkGenerator(X, y, chunk_size=CHUNK_SIZE)
+    stream = ChunkGenerator(X, y, chunk_size=CHUNK_SIZE)
+    N_CHUNKS = min(len(X) // stream.chunk_size, MAX_CHUNKS)
 
-    gif = FrameAnimaton()
-    axlim=(np.min(X) - 0.1, np.max(X) + 0.1)
-    xlim=(np.min(X[:, 0]) - 0.1, np.max(X[:, 0]) + 0.1)
-    ylim=(np.min(X[:, 1]) - 0.1, np.max(X[:, 1]) + 0.1)
+    N_CLUSTERS = len(np.unique(y))
 
-    for i, (X_test, y_test) in tqdm(enumerate(s), total=N_CHUNKS):
+    ESTIMATORS = [
+        PCSKMeans(n_clusters=N_CLUSTERS, random_state=100),
+        COPKMeans(n_clusters=N_CLUSTERS, random_state=100),
+        MiniBatchCOPKmeans(n_clusters=N_CLUSTERS, random_state=100),
+    ]
+
+    ESTIMATORS_N = [
+        "PCSKMeans",
+        "COPKMeans",
+        "ShuffledCOPKmeans",
+    ]
+
+    scores = np.zeros((len(ESTIMATORS), N_CHUNKS))
+    etimes = np.zeros((len(ESTIMATORS), N_CHUNKS))
+
+    for i, (X_test, y_test) in tqdm(enumerate(stream), total=N_CHUNKS):
         if i == N_CHUNKS:
             break
 
-        complexities.append({
-            # **ecol.overlapping(X_test, y_test),
-            # **ecol.linearity(X_test, y_test),
-            # **ecol.neighborhood(X_test, y_test),
-            # **ecol.network(X_test, y_test),
-            # **ecol.balance(X_test, y_test),
-        })
-        const = make_constraints(y_test, ratio=C_RATIO, random_state=100)
-
-        fig = plt.figure(figsize=(G * len(ESTIMATORS) + 1, W * G))
-        grid = fig.add_gridspec(3, len(ESTIMATORS) + 1)
-
-        # ax = fig.add_subplot(grid[0, 0])
-        # ax.set_title("DS")
-        # ax.set_ylabel(f"chunk_{i}")
-        # ax.scatter(*X_test.T, c=y_test)
-        # ax.set_xlim(*axlim)
-        # ax.set_ylim(*axlim)
+        const_mat = make_constraints(y_test, ratio=C_RATIO, random_state=100)
 
         for j, est in enumerate(ESTIMATORS):
-            est_name = type(est).__name__
+            s_time = time.time()
+            est.partial_fit(X_test, const_mat)
+            y_pred = est.labels_
+            e_time = time.time()
+            scores[j, i] = adjusted_rand_score(y_test, y_pred)
+            etimes[j, i] = e_time - s_time
 
-            if "PCS" in est_name or "COP" in est_name:
-                est_ = clone(est)
-                est_.fit(X_test, const)
-                y_pred = est_.predict(X_test)
-            else:
-                y_pred = est.fit_predict(X_test, y_test)
-
-            score = adjusted_rand_score(y_test, y_pred)
-            scores[j, i] = score
-
-            # ax = fig.add_subplot(grid[0, j + 1])
-            # ax.set_title(est_name)
-            # ax.scatter(*X_test.T, c=y_pred)
-            #
-            # if "PCSK" in est_name:
-            #     for ci, cj in combinations(range(len(X_test)), 2):
-            #         if const[ci, cj] == 1:
-            #             ax.plot(X_test[(ci, cj), 0], X_test[(ci, cj), 1], 'g--', alpha=0.3)
-            #         elif const[ci, cj] == -1:
-            #             ax.plot(X_test[(ci, cj), 0], X_test[(ci, cj), 1], 'r--', alpha=0.1)
-            #
-            # ax.set_xlim(*axlim)
-            # ax.set_ylim(*axlim)
-            # plt.setp(ax.get_yticklabels(), visible=False)
+        fig = plt.figure(figsize=(G * 3 + 1, W * G))
+        grid = fig.add_gridspec(2, 3 + 1)
 
         # SCORES
-        ax = fig.add_subplot(grid[1, :])
-        ax.set_title("Adjusted Rand Score")
+        ax = fig.add_subplot(grid[0, :], figsize=(2, 2))
+        ax.set_title("Performance")
+        ax.set_ylabel("Adjusted Rand Index")
+        ax.set_xlabel("Chunks")
+
         for s in scores:
-            ax.plot(np.arange(1, i+2), s[:i+1])
+            ax.plot(np.arange(1, i + 2), s[:i + 1], linewidth=1.2, alpha=0.3)
 
-        ax.set_xlim(1, N_CHUNKS)
-        ax.set_ylim(-1.1, 1.1)
-
-        ax.grid()
-        ax.legend([
-            type(est).__name__ for est in ESTIMATORS
-        ])
-
-        df = pd.DataFrame(complexities)
-
-        ax = fig.add_subplot(grid[2, :])
-        ax.set_title("Difficulties")
-
-        for s in df.to_numpy().T:
-
-            ax.plot(np.arange(1, i+2), s[:i+1])
+        for s in scores:
+            rolling_mean = pd.Series(s[:i + 1]).rolling(window=5).mean()
+            ax.plot(np.arange(1, i + 2), rolling_mean, linewidth=0.8, linestyle='dashed')
 
         ax.set_xlim(1, N_CHUNKS)
         ax.set_ylim(-0.1, 1.1)
 
         ax.grid()
-        ax.legend([ecol.COMPLEXITY_NAMES[n] for n in df.columns])
+        ax.legend(ESTIMATORS_N * 2)
+
+        # TIMES
+        ax = fig.add_subplot(grid[1, :])
+        ax.set_title("Execution time")
+        for s in etimes:
+            ax.plot(np.arange(1, i + 2), s[:i + 1], alpha=0.85)
+
+        ax.set_xlim(1, N_CHUNKS)
+        ax.set_ylim(etimes.min() - 0.1, etimes.max() + 0.1)
+
+        ax.grid()
+        ax.legend(ESTIMATORS_N)
 
         plt.tight_layout()
-        gif.add_frame()
         plt.savefig("foo.png")
         plt.close()
 
-    gif.export('foo.gif', delay=20)
 
 if __name__ == '__main__':
     main()

@@ -1,13 +1,11 @@
 import numpy as np
 
-class ChunkGenerator:
-    def __init__(self, X, y, chunk_size=100):
+
+class GeneratorBase:
+    def __init__(self, X, y):
         self.X = X
         self.y = y
-        self.chunk_size = chunk_size
-
-        self._curr_i = 0
-        self._next_i = 0
+        self.active_indices_ = []
 
     def __iter__(self):
         return self
@@ -15,69 +13,77 @@ class ChunkGenerator:
     def __next__(self):
         self.advance()
 
-        if self._next_i > len(self.X):
+        if len(self.active_indices_) == 0:
             raise StopIteration
 
-        ind = self.get_current_indices()
-        return self.X[ind], self.y[ind]
+        return self.X[self.active_indices_], self.y[self.active_indices_]
 
     def advance(self):
-        self._curr_i = self._next_i
-        self._next_i += self.chunk_size
+        raise NotImplementedError
 
     def get_current_indices(self):
-        return range(self._curr_i, self._next_i)
+        return self.active_indices_
 
 
-class RandomChunkGenerator():
-    def __init__(self, X, y, chunk_size=100, random_state=None):
-        self.X = X
-        self.y = y
+class ChunkGenerator(GeneratorBase):
+    def __init__(self, X, y, chunk_size=100, n_chunks=None):
+        super(ChunkGenerator, self).__init__(X, y)
+
         self.chunk_size = chunk_size
+        self.n_chunks = n_chunks
+
+        max_chunks = len(X) // chunk_size
+        self.n_chunks_ = max_chunks if self.n_chunks is None else min(max_chunks, n_chunks)
+        self.chunk_ = 0
+
+    def advance(self):
+        if self.chunk_ >= self.n_chunks_:
+            self.active_indices_ = []
+            return
+
+        start = self.chunk_ * self.chunk_size
+        self.active_indices_ = np.arange(start, start + self.chunk_size)
+        self.chunk_ += 1
+
+
+class RandomChunkGenerator(GeneratorBase):
+    def __init__(self, X, y, chunk_size=100, n_chunks=None, random_state=None):
+        super(RandomChunkGenerator, self).__init__(X, y)
+
+        self.chunk_size = chunk_size
+        self.n_chunks = n_chunks
         self.random_state = random_state
 
-        self._rng = np.random.default_rng(self.random_state)
-        self._curr_ind = None
-
-    def __next__(self):
-        self.advance()
-        ind = self.get_current_indices()
-        return self.X[ind], self.y[ind]
-
-    def __iter__(self):
-        return self
+        self.rng_ = np.random.default_rng(self.random_state)
+        self.chunk_ = 0
 
     def advance(self):
-        self._curr_ind = self._rng.choice(range(len(self.X), size=self.chunk_size, replace=False))
+        if self.n_chunks is not None and self.chunk_ >= self.n_chunks:
+            self.active_indices_ = []
+            return
 
-    def get_current_indices(self):
-        return self._curr_ind
+        self.active_indices_ = self.rng_.choice(np.arange(len(self.X)), size=self.chunk_size, replace=False)
+        self.chunk_ += 1
 
-
-def main():
-    import time
-    import matplotlib.pyplot as plt
-    from sklearn.datasets import make_moons
-
-    X, y = make_moons(n_samples=10000)
-
-    xlim=(np.min(X[:, 0]) - 0.1, np.max(X[:, 0]) + 0.1)
-    ylim=(np.min(X[:, 1]) - 0.1, np.max(X[:, 1]) + 0.1)
-
-    s = ChunkGenerator(X, y)
-
-    for X_, y_ in s:
-        fig = plt.figure(figsize=(6, 6))
-        ax = plt.axes()
-
-        ax.scatter(*X_.T, c=y_)
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
-
-        plt.tight_layout()
-        plt.savefig("foo.png")
-        time.sleep(0.1)
-        plt.close()
 
 if __name__ == '__main__':
-    main()
+    N_SAMPLES = 20
+    X = np.arange(N_SAMPLES)
+    y = np.ones(N_SAMPLES)
+    s = RandomChunkGenerator(X, y, chunk_size=10, n_chunks=None, random_state=10)
+
+    print("Manual")
+
+    print(s.get_current_indices())
+
+    s.advance()
+    print(s.get_current_indices())
+
+    s.advance()
+    print(s.get_current_indices())
+
+    print("Loop")
+
+    s = RandomChunkGenerator(X, y, chunk_size=10, n_chunks=1, random_state=10)
+    for X, y in s:
+        print(s.active_indices_)

@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def make_normal_blobs(centers, n_samples=1000, weights=None, random_state=None):
     rng = np.random.default_rng(random_state)
     n_classes = len(centers)

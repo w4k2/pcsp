@@ -3,8 +3,10 @@ from scipy import spatial as sdist
 import copy
 
 from sklearn.metrics import pairwise_distances
-from sklearn.cluster._kmeans import kmeans_plusplus
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_random_state
+
+from .common import initialize_centers
 
 def l2_distance(point1, point2):
     return sum([(float(i) - float(j)) ** 2 for (i, j) in zip(point1, point2)])
@@ -43,37 +45,28 @@ def binary_search_delta(obj, s, max_iter=200):
 
 
 class PCSKMeans(BaseEstimator, ClusterMixin):
-    def __init__(self, n_clusters=2, sparsity=1.1, tol=1e-4, max_iter=20000, init_centroids='kmeans++'):
+    def __init__(self, n_clusters=2, sparsity=1.1, tol=1e-4, max_iter=20000, init=None, random_state=None):
         # Parameters
         self.n_clusters = n_clusters
         self.sparsity = sparsity
         self.tol = tol
         self.max_iter = max_iter
-        self.init_centroids = init_centroids
+        self.init = init
+        self.random_state = random_state
 
         # Fitting attributes
         self.cluster_centers_ = None
         self.labels_ = None
         self.weights_ = None
+        self.random_state_ = None
 
     def fit(self, X, const_mat=None):
+        self.random_state_ = check_random_state(self.random_state)
+        self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, self.random_state)
+
         # n = number of instances / d = number of features
         n, d = X.shape
         tol = tolerance(self.tol, X)
-
-        # Initialize centroids
-        if self.init_centroids is None:
-            # self.cluster_centers_ = np.random.rand(self.n_clusters, d)
-            # dataset_diameter = np.max(pairwise_distances(X, metric='euclidean'))
-            #
-            # for i in range(self.n_clusters):
-            #     self.cluster_centers_[i, :] = self.cluster_centers_[i, :] + np.min(X, 0)
-            seeds = np.random.permutation(len(X))[:self.n_clusters]
-            self.cluster_centers_ = X[seeds]
-        elif type(self.init_centroids) is str and 'kmeans++' in self.init_centroids:
-            self.cluster_centers_ = kmeans_plusplus(X, self.n_clusters)[0]
-        else:
-            self.cluster_centers_ = self.init_centroids
 
         max_distance = np.power(np.max(X, axis=0) - np.min(X, axis=0), 2)
         self.weights_ = np.ones(d, dtype=np.float) * np.sqrt(d)
