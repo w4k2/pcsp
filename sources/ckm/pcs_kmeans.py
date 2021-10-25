@@ -48,6 +48,7 @@ class PCSKMeans(BaseEstimator, ClusterMixin):
         self.labels_ = None
         self.weights_ = None
         self.random_state_ = None
+        self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
         self.cluster_centers_ = None
@@ -143,6 +144,7 @@ class PCSKMeans(BaseEstimator, ClusterMixin):
             if shift <= tol:
                 break
 
+        self.n_iter_ = iters
         return self
 
     def predict(self, X):

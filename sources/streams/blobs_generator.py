@@ -38,7 +38,7 @@ def make_beta_blobs(centers, radius=None, a=1, b=1, n_samples=1000, weights=None
         weights = [1 / n_classes] * n_classes
 
     weights = np.array(weights)
-    assert weights.sum() == 1
+    # assert weights.sum() == 1
 
     class_samples = (weights * n_samples).astype(int)
     if class_samples.sum() != n_samples:

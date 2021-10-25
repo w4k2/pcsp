@@ -190,6 +190,7 @@ class COPKMeans(BaseEstimator, ClusterMixin):
         self.cluster_centers_ = None
         self.labels_ = None
         self.random_state_ = None
+        self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
         self.cluster_centers_ = None
@@ -215,7 +216,7 @@ class COPKMeans(BaseEstimator, ClusterMixin):
         centers = self.cluster_centers_
         clusters = [-1] * len(X)
 
-        for i in range(self.max_iter):
+        for it in range(self.max_iter):
             self.labels_ = [-1] * len(X)
             for i, d in enumerate(X):
                 indices, _ = closest_clusters(centers, d)
@@ -232,6 +233,7 @@ class COPKMeans(BaseEstimator, ClusterMixin):
                         counter += 1
 
                     if not found_cluster:
+                        self.n_iter_ = it
                         # warn(f"No feasible assignation. Iteration: {i}")
                         return self
 
@@ -243,6 +245,7 @@ class COPKMeans(BaseEstimator, ClusterMixin):
             clusters = self.labels_
             centers = self.cluster_centers_
 
+        self.n_iter_ = it
         return self
 
     def predict(self, X):

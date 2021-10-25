@@ -85,7 +85,7 @@ class MiniBatchCOPKmeans:
         data_indices = np.arange(len(X))
         self.random_state_.shuffle(data_indices)
 
-        for i in data_indices[:self.batch_size]:
+        for i in data_indices:
             distances = np.array([
                 dist(X[i], c) for c in cluster_centers
             ])
