@@ -18,7 +18,7 @@ def violates_constraints(i, cluster_index, labels, const_mat):
 
 # MiniBatch approach
 class MiniBatchCOPKmeans:
-    def __init__(self, n_clusters=2, max_iter=100, batch_size=100, tol=1e-3, init='random', random_state=None):
+    def __init__(self, n_clusters=2, max_iter=300, batch_size=100, tol=1e-4, init=None, random_state=None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
         self.batch_size = batch_size

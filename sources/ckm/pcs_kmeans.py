@@ -34,7 +34,7 @@ def binary_search_delta(obj, s, max_iter=200):
 
 
 class PCSKMeans(BaseEstimator, ClusterMixin):
-    def __init__(self, n_clusters=2, sparsity=1.1, tol=1e-4, max_iter=20000, init=None, random_state=None):
+    def __init__(self, n_clusters=2, sparsity=1.1, tol=1e-4, max_iter=300, init=None, random_state=None):
         # Parameters
         self.n_clusters = n_clusters
         self.sparsity = sparsity
