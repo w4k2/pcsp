@@ -2,14 +2,12 @@ import numpy as np
 from itertools import combinations
 
 # Prepare feasible constrint set
-def make_constraints(y, ratio=1.0, random_state=None, use_matrix=True):
+def make_constraints(y, ratio=1.0, random_state=None, use_matrix=False):
     rng = np.random.default_rng(random_state)
-    # Max constraints is a number of possible pairwise connections, so $$ \binom{k}{2} = k * k - 1 / 2 $$.
+    # Max constraints is a number of possible pairwise connections, so $$ \binom{k}{2} = k * (k - 1) / 2 $$.
     max_const = (len(y) * (len(y) - 1)) / 2
     n_const = round(max_const * ratio)
 
-    # isn't that pythonic
-    # source: https://docs.python.org/3/library/itertools.html
     combs = tuple(combinations(range(len(y)), 2))
     indices = sorted(rng.choice(range(len(combs)), n_const, replace=False))
     pairs = [combs[i] for i in indices]
@@ -27,7 +25,7 @@ def make_constraints(y, ratio=1.0, random_state=None, use_matrix=True):
     else:
         ml, cl = [], []
 
-        for pair in pairs:
+        for (i, j) in pairs:
             if y[i] == y[j]:
                 ml.append((i, j))
             else:
@@ -70,7 +68,7 @@ def const_list_to_graph(ml, cl, n):
     for i in ml_graph:
         for j in ml_graph[i]:
             if j != i and j in cl_graph[i]:
-                raise Exception('inconsistent constraints between %d and %d' % (i, j))
+                raise Exception('Inconsistent constraints between %d and %d' % (i, j))
 
     return ml_graph, cl_graph
 
@@ -86,6 +84,7 @@ def const_mat_to_const_list(const_mat):
 
     return ml, cl
 
+
 def main():
     import matplotlib.pyplot as plt
     from sklearn.datasets import make_moons, make_blobs
@@ -93,7 +92,7 @@ def main():
     from sklearn.model_selection import train_test_split
 
     X, y = make_moons(n_samples=20, random_state=100)
-    const_mat = make_constraints(y, ratio=0.01)
+    const_mat = make_constraints(y, ratio=0.05, use_matrix=True)
 
     y_pred = KMeans(n_clusters=len(np.unique(y))).fit_predict(X)
     chk_mat = check_unsatisfied_constraints(const_mat, y_pred)
@@ -104,20 +103,20 @@ def main():
     print(C)
     print(U / C)
 
-    fig = plt.figure(figsize=(8, 4))
-    spec = fig.add_gridspec(ncols=2, nrows=1)
+    fig = plt.figure(figsize=(6, 5))
+    spec = fig.add_gridspec(ncols=1, nrows=1)
 
     ax = fig.add_subplot(spec[0, 0])
-    ax.scatter(*X.T, c=y)
+    ax.scatter(*X.T, c=y, s=40)
 
     for i, j in combinations(range(len(X)), 2):
         if const_mat[i, j] == 1:
-            ax.plot(X[(i, j), 0], X[(i, j), 1], 'g--', alpha=0.3)
+            ax.plot(X[(i, j), 0], X[(i, j), 1], 'g--', alpha=0.5)
         elif const_mat[i, j] == -1:
-            ax.plot(X[(i, j), 0], X[(i, j), 1], 'r--', alpha=0.1)
+            ax.plot(X[(i, j), 0], X[(i, j), 1], 'r--', alpha=0.3)
 
-    ax = fig.add_subplot(spec[0, 1])
-    ax.scatter(*X.T, c=y_pred)
+    # ax = fig.add_subplot(spec[0, 1])
+    # ax.scatter(*X.T, c=y_pred)
 
     plt.tight_layout()
     plt.savefig("foo.png")

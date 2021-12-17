@@ -140,5 +140,6 @@ cython_debug/
 # Project artifacts
 data/
 _datasets_npy/
+_results_npy/
 foo.png
 bar.png
