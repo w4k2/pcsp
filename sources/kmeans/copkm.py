@@ -1,6 +1,6 @@
 import numpy as np
 
-from sources.ckm.common import initialize_centers, tolerance
+from .common import initialize_centers, tolerance
 from sklearn.utils import check_random_state
 
 from scipy.spatial.distance import cdist as dist
@@ -47,7 +47,7 @@ class COPKMeans:
 
         # Initialize cluster centers
         if self.cluster_centers_ is None:
-            self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, self.random_state)
+            self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, const_mat=const_mat, random_state=self.random_state)
 
         # Repeat until convergence or max iters
         for iteration in range(self.max_iter):
