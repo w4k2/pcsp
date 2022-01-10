@@ -2,7 +2,7 @@ import numpy as np
 from itertools import combinations
 
 # Prepare feasible constrint set
-def make_constraints(y, ratio=1.0, random_state=None, use_matrix=False):
+def make_constraints(y, ratio=1.0, random_state=None, use_matrix=True):
     rng = np.random.default_rng(random_state)
     # Max constraints is a number of possible pairwise connections, so $$ \binom{k}{2} = k * (k - 1) / 2 $$.
     max_const = (len(y) * (len(y) - 1)) / 2
@@ -34,43 +34,22 @@ def make_constraints(y, ratio=1.0, random_state=None, use_matrix=False):
         return ml, cl
 
 
-def check_unsatisfied_constraints(const_mat, y_pred):
-    chk_mat = np.zeros_like(const_mat)
-
-    for i, j in combinations(range(len(y_pred)), 2):
-        if const_mat[i, j] == 1:
-            if y_pred[i] != y_pred[j]:
-                chk_mat[i, j] = 1
-        elif const_mat[i, j] == -1:
-            if y_pred[i] == y_pred[j]:
-                chk_mat[i, j] = 1
-
-    return chk_mat
-
-
-def const_list_to_graph(ml, cl, n):
-    ml_graph = dict()
-    cl_graph = dict()
-    for i in range(n):
-        ml_graph[i] = set()
-        cl_graph[i] = set()
-
-    def add_both(d, i, j):
-        d[i].add(j)
-        d[j].add(i)
+def const_list_to_cont_mat(ml, cl, n):
+    const_matrix = np.zeros((len(y), len(y)))
 
     for (i, j) in ml:
-        add_both(ml_graph, i, j)
+        const_matrix[i, j] = 1
 
     for (i, j) in cl:
-        add_both(cl_graph, i, j)
+        if const_matrix[i, j] == 1:
+            raise Exception('Inconsistent constraints between %d and %d' % (i, j))
 
-    for i in ml_graph:
-        for j in ml_graph[i]:
-            if j != i and j in cl_graph[i]:
-                raise Exception('Inconsistent constraints between %d and %d' % (i, j))
+        const_matrix[i, j] = -1
 
-    return ml_graph, cl_graph
+        # Consider not a symmetric matrix
+        const_matrix += const_matrix.T
+
+    return const_mat
 
 
 def const_mat_to_const_list(const_mat):
@@ -83,6 +62,20 @@ def const_mat_to_const_list(const_mat):
             cl.append((i, j))
 
     return ml, cl
+
+
+def check_unsatisfied_constraints(const_mat, y_pred):
+    chk_mat = np.zeros_like(const_mat)
+
+    for i, j in combinations(range(len(y_pred)), 2):
+        if const_mat[i, j] == 1:
+            if y_pred[i] != y_pred[j]:
+                chk_mat[i, j] = 1
+        elif const_mat[i, j] == -1:
+            if y_pred[i] == y_pred[j]:
+                chk_mat[i, j] = 1
+
+    return chk_mat
 
 
 def main():

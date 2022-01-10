@@ -50,7 +50,6 @@ ESTIMATORS = OrderedDict({
     "PCK": PCKMeans,
     "COPK": COPKMeans,
     "SCOPK": SCOPKMeans,
-    # "SPCK": SPCKMeans,
 })
 
 def main():
@@ -60,7 +59,7 @@ def main():
         n_clusters = len(np.unique(y))
 
         estimators = [
-            e(n_clusters=n_clusters) for e in ESTIMATORS.values()
+            e(n_clusters=n_clusters, init=neighborhood) for e in ESTIMATORS.values()
         ]
 
         stream = ChunkGenerator(X, y, chunk_size=CHUNK_SAMPLES)

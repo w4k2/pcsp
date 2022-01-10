@@ -79,25 +79,22 @@ class PCKMeans:
         ml_graph, cl_graph, neighborhoods = preprocess_constraints(ml, cl, X.shape[0])
 
         # Initialize centroids
-        cluster_centers = self._initialize_cluster_centers(X, neighborhoods)
-        cluster_centers = initialize_centers(X, self.n_clusters, 'random', 100)
+        self.cluster_centers_ = self._initialize_cluster_centers(X, neighborhoods)
 
         # Repeat until convergence
         for iteration in range(self.max_iter):
             # Assign clusters
-            labels = self._assign_clusters(X, cluster_centers, ml_graph, cl_graph, self.w)
+            self.labels_ = self._assign_clusters(X, self.cluster_centers_, ml_graph, cl_graph, self.w)
 
             # Estimate means
-            prev_cluster_centers = cluster_centers
-            cluster_centers = self._get_cluster_centers(X, labels)
+            prev_cluster_centers = self.cluster_centers_
+            self.cluster_centers_ = self._get_cluster_centers(X, self.labels_)
 
             # Check for convergence
-            difference = (prev_cluster_centers - cluster_centers)
-            converged = np.allclose(difference, np.zeros(cluster_centers.shape), atol=1e-4, rtol=0)
+            difference = (prev_cluster_centers - self.cluster_centers_)
+            converged = np.allclose(difference, np.zeros(self.cluster_centers_.shape), atol=1e-4, rtol=0)
 
             if converged: break
-
-        self.cluster_centers_, self.labels_ = cluster_centers, labels
 
         self.n_iter_ = iteration
 
