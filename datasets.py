@@ -74,7 +74,7 @@ real_datasets = [
         # 'data/moa/airlines.arff',
         # 'data/moa/covtypeNorm.arff',
         # 'data/moa/elecNormNew.arff',
-        'data/moa/rbf.arff',
+        # 'data/moa/rbf.arff',
 ]
 
 synthetic_datasets = [
