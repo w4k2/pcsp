@@ -22,17 +22,14 @@ def initialize_centers(X, n_clusters, init, const_mat=None, random_state=None):
             return kmeans_plusplus(X, n_clusters, random_state=random_state)[0]
 
         elif INIT_NEIGHBORHOOD in init:
-            s = time()
             n_sub, labels = connected_components((const_mat == 1), directed=False, return_labels=True)
             sub_sizes = np.bincount(labels)
             center_ind = np.argsort(sub_sizes)[::-1][:n_clusters]
 
             # Just to be sure
             assert(len(center_ind) == n_clusters)
-            r = np.array([X[labels == _].mean(axis=0) for _ in center_ind])
-            s = time() - s
-            print(f"{s:.6f}")
-            return r
+
+            return np.array([X[labels == _].mean(axis=0) for _ in center_ind])
 
         elif INIT_RANDOM in init:
             rng = np.random.default_rng(random_state)

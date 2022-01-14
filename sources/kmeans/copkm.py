@@ -1,8 +1,7 @@
 import numpy as np
+from numpy import linalg as npl
 
 from .common import initialize_centers, tolerance
-from sklearn.utils import check_random_state
-
 from scipy.spatial.distance import cdist as dist
 
 class COPKMeans:
@@ -14,7 +13,6 @@ class COPKMeans:
         self.random_state = random_state
 
         # Initialization variables
-        self.random_state_ = None
         self.cluster_centers_ = None
 
         # Result variables
@@ -22,8 +20,6 @@ class COPKMeans:
         self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
-        self.random_state_ = check_random_state(self.random_state)
-
         tol = tolerance(X, self.tol)
 
         self.labels_ = np.full(X.shape[0], fill_value=-1)
@@ -32,7 +28,7 @@ class COPKMeans:
         # Repeat until convergence or max iters
         for iteration in range(self.max_iter):
             # Assign clusters
-            self.labels_ = self.assign_clusters(X, self.cluster_centers_, const_mat)
+            self.labels_ = self.assign_clusters(X, const_mat)
 
             if -1 in self.labels_:
                 return self # exit - no solution
@@ -45,10 +41,10 @@ class COPKMeans:
             ])
 
             # Check for convergence
-            if npl.norm(self.cluster_centers_ - prev_cluster_centers) < tol
+            if npl.norm(self.cluster_centers_ - prev_cluster_centers) < tol:
                 break
 
-        self.n_iter_ = iteration
+        self.n_iter_ = iteration + 1
 
         return self
 
@@ -59,7 +55,11 @@ class COPKMeans:
         for i in range(len(X)):
             for j in cdist[i].argsort():
                 # check violate contraints
-                if np.any(np.logical_or(labels[np.argwhere(const_mat[i] == 1] != j, labels[np.argwhere(const_mat[i] == -1] == j)):
+                for _ in labels[np.argwhere(const_mat[i] == 1)]:
+                    if not (_ == j or j == -1):
+                        continue
+
+                if np.any(labels[np.argwhere(const_mat[i] == -1)] == j):
                     continue
 
                 labels[i] = j

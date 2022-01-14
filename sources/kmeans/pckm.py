@@ -1,7 +1,7 @@
 import numpy as np
 
 from .common import tolerance, initialize_centers, INIT_NEIGHBORHOOD
-from sklearn.utils import check_random_state
+from numpy import linalg as npl
 from warnings import warn
 from time import time
 
@@ -9,10 +9,10 @@ class PCKMeans:
     def __init__(self, n_clusters=2, max_iter=300, tol=1e-4, init=None, weight=1, random_state=None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
-        self.weight = weights
-
-        # Initialization variables
-        self.random_state_ = None
+        self.tol = tol
+        self.init = init
+        self.weight = weight
+        self.random_state = random_state
 
         # Result variables
         self.cluster_centers_ = None
@@ -20,8 +20,6 @@ class PCKMeans:
         self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
-        self.random_state_ = check_random_state(self.random_state)
-
         tol = tolerance(X, self.tol)
 
         self.labels_ = np.full(X.shape[0], fill_value=-1)
@@ -30,7 +28,7 @@ class PCKMeans:
         # Repeat until convergence or max iters
         for iteration in range(self.max_iter):
             # Assign clusters
-            self.labels_ = self.assign_clusters(X, self.cluster_centers_, const_mat)
+            self.labels_ = self.assign_clusters(X, const_mat)
 
             # Estimate new centers
             prev_cluster_centers = self.cluster_centers_.copy()
@@ -40,10 +38,10 @@ class PCKMeans:
             ])
 
             # Check for convergence
-            if npl.norm(self.cluster_centers_ - prev_cluster_centers) < tol
+            if npl.norm(self.cluster_centers_ - prev_cluster_centers) < tol:
                 break
 
-        self.n_iter_ = iteration
+        self.n_iter_ = iteration + 1
 
         return self
 

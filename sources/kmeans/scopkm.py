@@ -1,21 +1,9 @@
 import numpy as np
+from numpy import linalg as npl
 
-from sources.ckm.common import initialize_centers, tolerance
-from sklearn.utils import check_random_state
-
+from .common import initialize_centers, tolerance
 from scipy.spatial.distance import cdist as dist
-
-def violates_constraints(i, cluster_index, labels, const_mat):
-    for j in np.argwhere(const_mat[i] == 1):
-        if 0 < labels[j] != cluster_index:
-            return True
-
-    for j in np.argwhere(const_mat[i] == -1):
-        if cluster_index == labels[j]:
-            return True
-
-    return False
-
+from sklearn.utils import check_random_state
 
 class SCOPKMeans:
     def __init__(self, n_clusters=2, max_iter=300, tol=1e-4, init=None, random_state=None):
@@ -34,62 +22,47 @@ class SCOPKMeans:
         self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
-        self.random_state_ = None
-        self.cluster_centers_ = None
-        return self.partial_fit(X, const_mat)
-
-    def partial_fit(self, X, const_mat=None):
-        self.labels_ = np.full(X.shape[0], fill_value=-1)
+        self.random_state_ = check_random_state(self.random_state)
         tol = tolerance(X, self.tol)
 
-        if self.random_state_ is None:
-            self.random_state_ = check_random_state(self.random_state)
-
-        # Initialize cluster centers
-        if self.cluster_centers_ is None:
-            self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, self.random_state)
-
-        cluster_centers = self.cluster_centers_
+        self.labels_ = np.full(X.shape[0], fill_value=-1)
+        self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, const_mat=const_mat, random_state=self.random_state)
 
         # Repeat until convergence or max iters
         for iteration in range(self.max_iter):
-            prev_cluster_centers = cluster_centers.copy()
-
             # Assign clusters
-            labels = self.assign_clusters(X, cluster_centers, const_mat)
+            self.labels_ = self.assign_clusters(X, const_mat)
 
-            # Estimate means
-            cluster_centers = np.array([
-                X[labels == i].mean(axis=0)
-                if sum(labels == i) > 0
-                else self.cluster_centers_[i]
+            # Estimate new centers
+            prev_cluster_centers = self.cluster_centers_.copy()
+            self.cluster_centers_ = np.array([
+                X[self.labels_ == i].mean(axis=0)
+                if np.sum(self.labels_ == i) > 0
+                else prev_cluster_centers[i]
                 for i in range(self.n_clusters)
             ])
 
             # Check for convergence
-            cluster_centers_shift = (prev_cluster_centers - cluster_centers)
-            converged = np.allclose(cluster_centers_shift, np.zeros(cluster_centers.shape), atol=tol, rtol=0)
-
-            if converged:
+            if npl.norm(self.cluster_centers_ - prev_cluster_centers) < tol:
                 break
 
         self.n_iter_ = iteration
-        self.cluster_centers_, self.labels_ = cluster_centers, labels
 
         return self
 
-    def assign_clusters(self, X, cluster_centers, const_mat):
+    def assign_clusters(self, X, const_mat):
         labels = np.full(X.shape[0], fill_value=-1)
+        cdist = dist(X, self.cluster_centers_)
 
-        data_indices = np.arange(len(X))
-        self.random_state_.shuffle(data_indices)
+        index = list(range(len(X)))
+        self.random_state_.shuffle(index)
+        for i in index:
+            for j in cdist[i].argsort():
+                # Check violate contraints
+                if np.any(np.concatenate([labels[np.argwhere(const_mat[i] == 1)] != j, labels[np.argwhere(const_mat[i] == -1)] == j])):
+                    continue
 
-        cdist = dist(X, cluster_centers)
-
-        for i in data_indices:
-            for cluster_index in cdist[i].argsort():
-                if not violates_constraints(i, cluster_index, labels, const_mat):
-                    labels[i] = cluster_index
-                    break
+                labels[i] = j
+                break
 
         return labels
