@@ -5,7 +5,7 @@ from scipy.spatial.distance import cdist as dist
 
 
 class KMeans:
-    def __init__(self, n_clusters=2, max_iter=300, tol=1e-4, init=None, random_state=None):
+    def __init__(self, n_clusters=2, max_iter=100, tol=1e-4, init=None, random_state=None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
         self.tol = tol
@@ -21,12 +21,22 @@ class KMeans:
         self.n_iter_ = 0
 
     def fit(self, X):
-        tol = tolerance(X, self.tol)
+        self._initialize(X)
 
-        self.labels_ = np.full(X.shape[0], fill_value=-1)
+        return self._fit(X)
+
+    def partial_fit(self, X):
+        if self.cluster_centers_ is None:
+            self._initialize(X)
+
+        return self._fit(X)
+
+    def _initialize(self, X):
         self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, random_state=self.random_state)
 
-        # Repeat until convergence or max iters
+    def _fit(self, X):
+        tol = tolerance(X, self.tol)
+
         for iteration in range(self.max_iter):
             # Assign clusters
             self.labels_ = self.assign_clusters(X)

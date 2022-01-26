@@ -6,7 +6,7 @@ from warnings import warn
 from time import time
 
 class PCKMeans:
-    def __init__(self, n_clusters=2, max_iter=300, tol=1e-4, init=None, weight=1, random_state=None):
+    def __init__(self, n_clusters=2, max_iter=100, tol=1e-4, init=None, weight=1, random_state=None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
         self.tol = tol
@@ -20,12 +20,22 @@ class PCKMeans:
         self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
-        tol = tolerance(X, self.tol)
+        self._initialize(X, const_mat)
 
-        self.labels_ = np.full(X.shape[0], fill_value=-1)
+        return self._fit(X, const_mat)
+
+    def partial_fit(self, X, const_mat=None):
+        if self.cluster_centers_ is None:
+            self._initialize(X, const_mat)
+
+        return self._fit(X, const_mat)
+
+    def _initialize(self, X, const_mat=None):
         self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, const_mat=const_mat, random_state=self.random_state)
 
-        # Repeat until convergence or max iters
+    def _fit(self, X, const_mat=None):
+        tol = tolerance(X, self.tol)
+
         for iteration in range(self.max_iter):
             # Assign clusters
             self.labels_ = self.assign_clusters(X, const_mat)

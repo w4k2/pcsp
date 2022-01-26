@@ -31,7 +31,8 @@ def initialize_centers(X, n_clusters, init, const_mat=None, random_state=None):
 
             return np.array([X[labels == _].mean(axis=0) for _ in center_ind])
 
-        elif INIT_RANDOM in init:
+        # also INIT_RANDOM
+        else:
             rng = np.random.default_rng(random_state)
             seeds = rng.permutation(len(X))[:n_clusters]
             return np.copy(X[seeds])

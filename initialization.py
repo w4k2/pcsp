@@ -2,10 +2,14 @@ import numpy as np
 
 from sklearn.datasets import make_moons
 from sklearn.metrics import adjusted_rand_score
+from sklearn.utils import check_random_state
 
 from sources.kmeans import KMeans, PCKMeans, COPKMeans, SCOPKMeans
 from sources.kmeans import INIT_KMPP, INIT_RANDOM, INIT_NEIGHBORHOOD
 from sources.helpers import make_constraints
+
+import pandas as pd
+from pandasgui import show
 
 C_RATIOS = [
     0.01,
@@ -22,34 +26,49 @@ INITS = [
 ]
 
 ESTIMATORS = [
-    # KMeans,
-    # PCKMeans,
-    # COPKMeans,
+    KMeans,
+    PCKMeans,
+    COPKMeans,
     SCOPKMeans,
 ]
 
 SEED = 1010
-
+N_SAMPLES = 1000
 N_CLUSTERS = 2
 
 def main():
-    X, y = make_moons(n_samples=200, random_state=100)
-    for c_ratio in C_RATIOS:
-        print('ratio', c_ratio)
-        const_mat = make_constraints(y, ratio=c_ratio, random_state=100)
+    random_state = check_random_state(SEED)
+    np_rs = np.random.default_rng(SEED)
 
-        for init in INITS:
-            print('init', init)
-            for est in ESTIMATORS:
-                e = est(n_clusters=N_CLUSTERS, init=init, random_state=SEED)
-                if 'const_mat' in est.fit.__code__.co_varnames:
-                    e.fit(X, const_mat=const_mat)
-                else:
-                    e.fit(X)
+    folds = [
+        make_moons(n_samples=46, random_state=random_state),
+        make_moons(n_samples=46, random_state=random_state),
+        make_moons(n_samples=46, random_state=random_state),
+        make_moons(n_samples=46, random_state=random_state),
+        make_moons(n_samples=46, random_state=random_state)
+    ]
 
-                print(est.__name__)
-                score = adjusted_rand_score(y, e.labels_)
-                print(e.n_iter_, '|', score)
+    results = []
+
+    for init in INITS:
+        for fold_i , (X, y) in enumerate(folds):
+            for c_ratio in C_RATIOS:
+                const_mat = make_constraints(y, ratio=c_ratio, random_state=np_rs)
+                for est in ESTIMATORS:
+                    print({"init": init, "c_ratio": c_ratio, "fold": fold_i, "clustering": est.__name__})
+
+                    e = est(n_clusters=N_CLUSTERS, init=init, random_state=SEED)
+                    if 'const_mat' in est.fit.__code__.co_varnames:
+                        e.fit(X, const_mat=const_mat)
+                    else:
+                        if init == INIT_NEIGHBORHOOD:
+                            continue
+                        e.fit(X)
+
+                    score = adjusted_rand_score(y, e.labels_)
+                    results.append({"init": init, "c_ratio": c_ratio, "fold": fold_i, "clustering": est.__name__, "n_iters": e.n_iter_, "rand index": score})
+
+    pd.DataFrame.from_dict(results).to_csv("results.csv")
 
 if __name__ == '__main__':
     main()

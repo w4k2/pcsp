@@ -11,21 +11,12 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-MAX_CHUNKS = 500
-SYNTHETIC_CHUNKS = 200
+MAX_CHUNKS = 200
+SYNTHETIC_CHUNKS = MAX_CHUNKS
 CHUNK_SAMPLES = 200
 MAX_SAMPLES = MAX_CHUNKS * CHUNK_SAMPLES
 
-concept_kwargs = {
-    "n_chunks": SYNTHETIC_CHUNKS,
-    "chunk_size": CHUNK_SAMPLES,
-    "n_classes": 2,
-    "random_state": 106,
-    "n_features": 2,
-    "n_informative": 2,
-    "n_redundant": 0,
-    "n_repeated": 0,
-}
+plt.set_cmap('jet')
 
 def strlearn_gen(stream):
     X, y = [], []
@@ -41,12 +32,13 @@ def prepare_gif(X, y, ds_name):
     print(f"Preparing gif for {ds_name} ...")
     gif = FrameAnimaton()
 
-    X = StandardScaler().fit_transform(X)
+    X = StandardScaler().fit_transform(X[:MAX_SAMPLES])
+    n_clusters = len(np.unique(y[:MAX_SAMPLES]))
 
     if X.shape[1] > 2:
         # Neeeeeeds reduuuuction
         print(f"ndim = {X.shape[1]} > 2 - reducing to 2")
-        X = TSNE(n_components=2).fit_transform(X, y)
+        X = PCA(n_components=2).fit_transform(X, y)
 
     # X = StandardScaler().fit_transform(X)
     lims = (min(X[:, 0].min(), X[:, 1].min()) * 1.02, max(X[:, 0].max(), X[:, 1].max()) * 1.02)
@@ -54,13 +46,23 @@ def prepare_gif(X, y, ds_name):
     s = ChunkGenerator(X, y, chunk_size=CHUNK_SAMPLES, n_chunks=MAX_CHUNKS)
 
     for i, (X_, y_) in tqdm(enumerate(s), total=MAX_CHUNKS):
-        fig = plt.figure(figsize=(4, 4))
-        ax = plt.gca()
+        fig = plt.figure(figsize=(4, 8))
+        fig.suptitle(f"{ds_name}")
 
-        ax.set_title(f"{i}")
-        ax.scatter(*X_.T, c=y_, s=3)
+        grid = fig.add_gridspec(2, 1)
+
+        ax = fig.add_subplot(grid[0, :])
+        ax.set_title(f"Chunk: {i}")
+        ax.scatter(*X_.T, c=y_, s=5)
         ax.set_xlim(*lims)
         ax.set_ylim(*lims)
+        ax.grid()
+
+        ax = fig.add_subplot(grid[1, :])
+        ax.set_title(f"Class distribution")
+        bc = np.bincount(y_, minlength=n_clusters) / float(CHUNK_SAMPLES)
+        ax.imshow(bc[:, np.newaxis], interpolation='none', vmin=0, vmax=1, cmap='gray_r', aspect='auto', origin='lower')
+
         plt.tight_layout()
         gif.add_frame()
         plt.close(fig)
@@ -68,48 +70,27 @@ def prepare_gif(X, y, ds_name):
     gif.export(f"streams_animation/{ds_name}.gif")
 
 real_datasets = [
-        # 'data/cse/kddcup99.arff',
-        # 'data/cse/powersupply.arff',
-        # 'data/cse/sensor.arff',
-        # 'data/moa/airlines.arff',
-        # 'data/moa/covtypeNorm.arff',
-        # 'data/moa/elecNormNew.arff',
-        # 'data/moa/rbf.arff',
+        'data/cse/kddcup99.arff',
+        'data/cse/powersupply.arff',
+        'data/cse/sensor.arff',
+        'data/moa/airlines.arff',
+        'data/moa/covtypeNorm.arff',
+        'data/moa/elecNormNew.arff',
+        'data/moa/rbf.arff',
 ]
 
+concept_kwargs = {
+    "n_chunks": SYNTHETIC_CHUNKS,
+    "chunk_size": CHUNK_SAMPLES,
+    "n_classes": 2,
+    "random_state": 200,
+    "n_features": 2,
+    "n_informative": 2,
+    "n_redundant": 0,
+    "n_repeated": 0,
+}
+
 synthetic_datasets = [
-    ('static_nooverlaping_balanced', lambda: make_moving_blobs(
-        centers=[
-            ((1, 1), (1, 1)),
-            ((-1, -1), (-1, -1)),
-        ],
-        radius=[
-            (1, 1),
-            (1, 1),
-        ],
-        weights=[
-            (1, 1),
-            (1, 1),
-        ],
-        chunk_size=CHUNK_SAMPLES,
-        n_chunks=SYNTHETIC_CHUNKS)
-    ),
-    ('static_overlaping_balanced', lambda: make_moving_blobs(
-        centers=[
-            ((0, 0), (0, 0)),
-            ((-1, -1), (-1, -1)),
-        ],
-        radius=[
-            (1, 1),
-            (1, 1),
-        ],
-        weights=[
-            (1, 1),
-            (1, 1),
-        ],
-        chunk_size=CHUNK_SAMPLES,
-        n_chunks=SYNTHETIC_CHUNKS)
-    ),
     ('dynamic_overlaping', lambda: make_moving_blobs(
         centers=[
             ((1, 1), (-1, -1)),
@@ -117,22 +98,6 @@ synthetic_datasets = [
         ],
         radius=[
             (1, 1),
-            (1, 1),
-        ],
-        weights=[
-            (1, 1),
-            (1, 1),
-        ],
-        chunk_size=CHUNK_SAMPLES,
-        n_chunks=SYNTHETIC_CHUNKS)
-    ),
-    ('dynamic_radius', lambda: make_moving_blobs(
-        centers=[
-            ((1, 1), (1, 1)),
-            ((-1, -1), (-1, -1)),
-        ],
-        radius=[
-            (1, 3),
             (1, 1),
         ],
         weights=[
@@ -163,23 +128,15 @@ synthetic_datasets = [
         ))
     ),
     ('strlearn_gradual_drift', lambda: strlearn_gen(sl.streams.StreamGenerator(
-        **concept_kwargs, n_drifts=1, concept_sigmoid_spacing=5
+            **concept_kwargs, n_drifts=1, concept_sigmoid_spacing=5
         ))
     ),
-    ('strlearn_incremental_drift', lambda: strlearn_gen(sl.streams.StreamGenerator(
-        **concept_kwargs, n_drifts=1, concept_sigmoid_spacing=5, incremental=True
+    ('strlearn_static_imbalance', lambda: strlearn_gen(sl.streams.StreamGenerator(
+        **concept_kwargs, weights=(0.1, 0.9)
         ))
     ),
-    ('strlearn_reccurent_drift', lambda: strlearn_gen(sl.streams.StreamGenerator(
-        **concept_kwargs, n_drifts=2, recurring=True
-        ))
-    ),
-    ('strlearn_dynamic_imbalanced_drift', lambda: strlearn_gen(sl.streams.StreamGenerator(
+    ('strlearn_dynamic_imbalance', lambda: strlearn_gen(sl.streams.StreamGenerator(
         **concept_kwargs, weights=(2, 5, 0.9)
-        ))
-    ),
-    ('strlearn_disco_drift', lambda: strlearn_gen(sl.streams.StreamGenerator(
-        **concept_kwargs, weights=(2, 5, 0.9), n_drifts=3, concept_sigmoid_spacing=5, recurring=True, incremental=True
         ))
     ),
 ]
@@ -188,22 +145,23 @@ def main():
     for ds in real_datasets:
         ds_name = ds.split('.')[0].split('/')[-1]
 
-        X, y = load_arff_dataset(ds)
+        X_, y_ = load_arff_dataset(ds)
         # limit to chunks on prepare
-        X, y = X[:MAX_SAMPLES], y[:MAX_SAMPLES]
+        X, y = X_[:MAX_SAMPLES], y_[:MAX_SAMPLES]
 
-        print(f"{ds_name} samples:", len(X))
+        print(f"{ds_name} samples:", len(X_))
         print(f"{ds_name} selected:", len(X))
 
         X = prepare_X(X)
         y = prepare_y(y)
         save_npy(X, y, ds_name)
-        # prepare_gif(X, y, ds_name)
+#        prepare_gif(X, y, ds_name)
 
     for ds_name, callback in synthetic_datasets:
         X, y = callback()
+        print(f"{ds_name} samples:", len(X))
         save_npy(X, y, ds_name)
-        # prepare_gif(X, y, ds_name)
+#        prepare_gif(X, y, ds_name)
 
 
 if __name__ == '__main__':

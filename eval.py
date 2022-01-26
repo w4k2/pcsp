@@ -3,15 +3,11 @@ import numpy as np
 import pandas as pd
 import time
 
-from collections import OrderedDict
-
 from sources.helpers.datasets import load_npy
-from sources.helpers.constraints import make_constraints, const_mat_to_const_list
+from sources.helpers.constraints import make_constraints
 from sources.streams.chunk_generator import ChunkGenerator
 
-from sources.ckm import COPKMeans, SCOPKMeans, PCKMeans
-from sklearn.cluster import KMeans
-
+from sources.kmeans import KMeans, PCKMeans, COPKMeans, SCOPKMeans, INIT_RANDOM
 from sklearn.metrics import adjusted_rand_score
 from tqdm import tqdm
 
@@ -23,19 +19,28 @@ W = 1.5
 MAX_CHUNKS = 500
 SYNTHETIC_CHUNKS = 200
 CHUNK_SAMPLES = 200
+SEED = 100
 
 datasets = [
-    "static_overlaping_balanced",
+    'kddcup99',
+    'powersupply',
+    'sensor',
+    'airlines',
+    'covtypeNorm',
+    'elecNormNew',
+    "dynamic_overlaping",
     "dynamic_imbalance",
     "strlearn_sudden_drift",
-    "strlearn_incremental_drift",
-    "strlearn_dynamic_imbalanced_drift",
+    "strlearn_gradual_drift",
+    "strlearn_static_imbalance",
+    "strlearn_dynamic_imbalance",
 ]
 
 ESTIMATORS = [
     ("KM", KMeans),
     ("PCK", PCKMeans),
     ("COPK", COPKMeans),
+    ("SCOPK", SCOPKMeans),
 ]
 
 def eval_dataset(ds_name):
@@ -43,31 +48,25 @@ def eval_dataset(ds_name):
     n_clusters = len(np.unique(y))
 
     estimators = [
-        e(n_clusters=n_clusters, init=neighborhood) for e in ESTIMATORS.values()
+        e(n_clusters=n_clusters, init=INIT_RANDOM, random_state=SEED) for e_name, e in ESTIMATORS
     ]
 
     stream = ChunkGenerator(X, y, chunk_size=CHUNK_SAMPLES)
 
     scores = np.zeros((len(estimators), stream.n_chunks_))
-    etimes = np.zeros((len(estimators), stream.n_chunks_))
+    iters = np.zeros((len(estimators), stream.n_chunks_))
 
     for i, (X_test, y_test) in tqdm(enumerate(stream), total=stream.n_chunks_):
-        const_mat = make_constraints(y_test, ratio=C_RATIO, random_state=100, use_matrix=True)
+        const_mat = make_constraints(y_test, ratio=C_RATIO, random_state=SEED)
 
-        for j, est in enumerate(estimators):
-            if j == 0:
-                est.fit(X_test)
-            elif j == 1:
-                ml, cl = const_mat_to_const_list(const_mat)
-                print(len(ml), len(cl))
-                est.fit(X_test, ml=ml, cl=cl)
+        for j, e in enumerate(estimators):
+            if 'const_mat' in e.fit.__code__.co_varnames:
+                e.partial_fit(X_test, const_mat=const_mat)
             else:
-                est.partial_fit(X_test, const_mat)
+                e.partial_fit(X_test)
 
-            y_pred = est.labels_
-
-            scores[j, i] = adjusted_rand_score(y_test, y_pred)
-            etimes[j, i] = float(est.n_iter_)
+            scores[j, i] = adjusted_rand_score(y_test, e.labels_)
+            iters[j, i] = float(e.n_iter_)
 
         fig = plt.figure(figsize=(G * 3 + 1, W * G))
         grid = fig.add_gridspec(2, 3 + 1)
@@ -91,23 +90,24 @@ def eval_dataset(ds_name):
         ax.set_ylim(-0.1, 1.1)
         ax.grid()
 
-        ax.legend(list(ESTIMATORS.keys()))
+        ax.legend([e_name for e_name, e in ESTIMATORS])
 
         # TIMES
         ax = fig.add_subplot(grid[1, :])
-        ax.set_title("Iterations")
-        for s in etimes:
+        ax.set_ylabel("Iterations")
+        for s in iters:
             ax.plot(np.arange(1, i + 2), s[:i + 1], alpha=0.85)
 
         ax.set_xlim(1, stream.n_chunks)
-        ax.set_ylim(etimes.min() - 0.3, etimes.max() + 5)
+        ax.set_ylim(iters.min() - 0.3, 100 + 0.3)
 
         ax.grid()
 
-        ax.legend(list(ESTIMATORS.keys()))
+        ax.legend([e_name for e_name, e in ESTIMATORS])
 
         plt.tight_layout()
-        plt.savefig(f"{ds_name}.png")
+        plt.savefig(f"eval/eval_{ds_name}.png")
+        plt.savefig(f"foo.png")
         plt.close()
 
     np.save(f"_results_npy/{ds_name}_res.npy", scores)

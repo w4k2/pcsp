@@ -6,7 +6,7 @@ from scipy.spatial.distance import cdist as dist
 from sklearn.utils import check_random_state
 
 class SCOPKMeans:
-    def __init__(self, n_clusters=2, max_iter=300, tol=1e-4, init=None, random_state=None):
+    def __init__(self, n_clusters=2, max_iter=100, tol=1e-4, init=None, random_state=None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
         self.tol = tol
@@ -22,13 +22,23 @@ class SCOPKMeans:
         self.n_iter_ = 0
 
     def fit(self, X, const_mat=None):
-        self.random_state_ = check_random_state(self.random_state)
-        tol = tolerance(X, self.tol)
+        self._initialize(X, const_mat)
 
-        self.labels_ = np.full(X.shape[0], fill_value=-1)
+        return self._fit(X, const_mat)
+
+    def partial_fit(self, X, const_mat=None):
+        if self.cluster_centers_ is None:
+            self._initialize(X, const_mat)
+
+        return self._fit(X, const_mat)
+
+    def _initialize(self, X, const_mat=None):
+        self.random_state_ = check_random_state(self.random_state)
         self.cluster_centers_ = initialize_centers(X, self.n_clusters, self.init, const_mat=const_mat, random_state=self.random_state)
 
-        # Repeat until convergence or max iters
+    def _fit(self, X, const_mat=None):
+        tol = tolerance(X, self.tol)
+
         for iteration in range(self.max_iter):
             # Assign clusters
             self.labels_ = self.assign_clusters(X, const_mat)
@@ -56,10 +66,15 @@ class SCOPKMeans:
 
         index = list(range(len(X)))
         self.random_state_.shuffle(index)
-        for i in index:
+
+        for i in range(len(X)):
             for j in cdist[i].argsort():
-                # Check violate contraints
-                if np.any(np.concatenate([labels[np.argwhere(const_mat[i] == 1)] != j, labels[np.argwhere(const_mat[i] == -1)] == j])):
+                # check violate contraints
+                for _ in labels[np.argwhere(const_mat[i] == 1)]:
+                    if not (_ == j or j == -1):
+                        continue
+
+                if np.any(labels[np.argwhere(const_mat[i] == -1)] == j):
                     continue
 
                 labels[i] = j
