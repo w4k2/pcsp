@@ -139,7 +139,7 @@ cython_debug/
 
 # Project artifacts
 data/
-_datasets_npy/
-_results_npy/
+_*/
 foo.png
 bar.png
+baz.png
