@@ -5,7 +5,7 @@ import os
 from sklearn.preprocessing import LabelEncoder
 from scipy.io import arff
 
-DEFAULT_DATASET_STORAGE = "_datasets_npy"
+DEFAULT_DATASET_STORAGE = "_datasets"
 if not os.path.isdir(DEFAULT_DATASET_STORAGE):
     os.mkdir(DEFAULT_DATASET_STORAGE)
 

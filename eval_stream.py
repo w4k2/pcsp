@@ -14,6 +14,7 @@ from tqdm import tqdm
 import multiprocessing
 
 C_RATIOS = [
+    0.001,
     0.01,
     0.05,
     0.10,
@@ -28,28 +29,28 @@ CHUNK_SAMPLES = 200
 SEED = 100
 
 datasets = [
-    # 'kddcup99',
-    # 'powersupply',
-    # 'sensor',
-    # 'airlines',
-    # 'covtypeNorm',
-    # 'elecNormNew',
+    'kddcup99',
+    'powersupply',
+    'sensor',
+    'airlines',
+    'covtypeNorm',
+    'elecNormNew',
     # "dynamic_overlaping",
     # "dynamic_imbalance",
-    "strlearn_sudden_drift",
-    "strlearn_gradual_drift",
+    # "strlearn_sudden_drift",
+    # "strlearn_gradual_drift",
     # "strlearn_static_imbalance",
     # "strlearn_dynamic_imbalance",
 ]
 
 ESTIMATORS = [
-    ("PCK", PCKMeans),
     ("COPK", COPKMeans),
+    ("PCK", PCKMeans),
 ]
 
 ONLINE_ESTIMATORS = [
-    ("SCOPK", SCOPKMeans),
-    ("SPCK", SPCKMeans),
+    ("COPK-S", SCOPKMeans),
+    ("PCK-S", SPCKMeans),
 ]
 
 def eval_dataset(ds_name):
@@ -57,7 +58,7 @@ def eval_dataset(ds_name):
     n_clusters = len(np.unique(y))
 
     estimators = [
-        e(n_clusters=n_clusters, init=INIT_NEIGHBORHOOD, random_state=SEED)
+        e(n_clusters=n_clusters, init=INIT_RANDOM, random_state=SEED)
         for e_name, e in ESTIMATORS
     ]
 
@@ -68,9 +69,10 @@ def eval_dataset(ds_name):
 
     for ratio in C_RATIOS:
         stream = ChunkGenerator(X, y, chunk_size=CHUNK_SAMPLES)
+        rs = np.random.default_rng(SEED)
+
         scores = np.zeros((len(estimators) + len(online_estimators), stream.n_chunks_))
         iters = np.zeros((len(estimators) + len(online_estimators), stream.n_chunks_))
-        rs = np.random.default_rng(SEED)
 
         for i, (X_test, y_test) in tqdm(enumerate(stream), total=stream.n_chunks_, desc=ds_name, position=datasets.index(ds_name)):
             const_mat = make_constraints(y_test, ratio=ratio, random_state=rs)
@@ -93,47 +95,45 @@ def eval_dataset(ds_name):
                 scores[j + len(estimators), i] = adjusted_rand_score(y_test, e.labels_)
                 iters[j + len(estimators), i] = float(e.n_iter_)
 
-            fig = plt.figure(figsize=(G * 3 + 1, W * G))
-            grid = fig.add_gridspec(2, 3 + 1)
+        fig = plt.figure(figsize=(G * 3 + 1, W * G))
+        grid = fig.add_gridspec(2, 3 + 1)
 
-            # SCORES
-            ax = fig.add_subplot(grid[0, :])
-            ax.set_ylabel("Adjusted Rand Index")
-            ax.set_xlabel("Chunks")
+        # SCORES
+        ax = fig.add_subplot(grid[0, :])
+        ax.set_ylabel("Adjusted Rand Index")
+        ax.set_xlabel("Chunks")
 
-            for s in scores:
-                ax.plot(np.arange(1, i + 2), s[:i + 1], linewidth=0.8, linestyle='dashed', alpha=0.4)
+        for s in scores:
+            rolling_mean = pd.Series(s[:i + 1]).rolling(window=10).mean()
+            ax.plot(np.arange(1, i + 2), rolling_mean, linewidth=1.6, alpha=0.8)
 
-            ax.set_prop_cycle(None)
+        ax.set_prop_cycle(None)
 
-            for s in scores:
-                rolling_mean = pd.Series(s[:i + 1]).rolling(window=10).mean()
-                ax.plot(np.arange(1, i + 2), rolling_mean, linewidth=1.6, alpha=0.8)
+        for s in scores:
+            ax.plot(np.arange(1, i + 2), s[:i + 1], linewidth=0.8, linestyle='dashed', alpha=0.4)
 
-            ax.set_xlim(1, stream.n_chunks)
-            ax.set_ylim(-0.1, 1.1)
-            ax.grid()
+        ax.set_xlim(1, stream.n_chunks)
+        ax.set_ylim(-0.1, 1.1)
+        ax.grid()
 
-            ax.legend([e_name for e_name, e in ESTIMATORS])
+        ax.legend([e_name for e_name, e in ESTIMATORS+ ONLINE_ESTIMATORS])
 
-            # TIMES
-            ax = fig.add_subplot(grid[1, :])
-            ax.set_ylabel("Iterations")
-            for s in iters:
-                ax.plot(np.arange(1, i + 2), s[:i + 1], alpha=0.85)
+        # TIMES
+        ax = fig.add_subplot(grid[1, :])
+        ax.set_ylabel("Iterations")
+        for s in iters:
+            ax.plot(np.arange(1, i + 2), s[:i + 1], alpha=0.85)
 
-            ax.set_xlim(1, stream.n_chunks)
-            ax.set_ylim(iters.min() - 0.3, 100 + 0.3)
+        ax.set_xlim(1, stream.n_chunks)
+        ax.set_ylim(iters.min() - 0.3, 100 + 0.3)
 
-            ax.grid()
+        ax.grid()
 
-            ax.legend([e_name for e_name, e in ESTIMATORS])
+        plt.tight_layout()
+        plt.savefig(f"_eval/{ds_name}_CR{ratio:.2f}.png")
+        plt.close()
 
-            plt.tight_layout()
-            plt.savefig(f"eval/eval_{ds_name}_r{ratio:.2f}.png")
-            plt.close()
-
-    # np.save(f"_results_npy/{ds_name}_res.npy", scores)
+        np.save(f"_results/{ds_name}_CR{ratio:.2f}.npy", scores)
 
 def main():
     jobs = []

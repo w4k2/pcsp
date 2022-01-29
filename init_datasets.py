@@ -36,11 +36,9 @@ def prepare_gif(X, y, ds_name):
     n_clusters = len(np.unique(y[:MAX_SAMPLES]))
 
     if X.shape[1] > 2:
-        # Neeeeeeds reduuuuction
         print(f"ndim = {X.shape[1]} > 2 - reducing to 2")
         X = PCA(n_components=2).fit_transform(X, y)
 
-    # X = StandardScaler().fit_transform(X)
     lims = (min(X[:, 0].min(), X[:, 1].min()) * 1.02, max(X[:, 0].max(), X[:, 1].max()) * 1.02)
 
     s = ChunkGenerator(X, y, chunk_size=CHUNK_SAMPLES, n_chunks=MAX_CHUNKS)
@@ -67,7 +65,7 @@ def prepare_gif(X, y, ds_name):
         gif.add_frame()
         plt.close(fig)
 
-    gif.export(f"streams_animation/{ds_name}.gif")
+    gif.export(f"{ds_name}.gif")
 
 real_datasets = [
         'data/cse/kddcup99.arff',
