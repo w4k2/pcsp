@@ -15,9 +15,8 @@ import multiprocessing
 
 C_RATIOS = [
     0.001,
-    0.01,
-    0.05,
-    0.10,
+    0.005,
+    0.010,
 ]
 
 G = 5
@@ -35,12 +34,12 @@ datasets = [
     'airlines',
     'covtypeNorm',
     'elecNormNew',
-    # "dynamic_overlaping",
-    # "dynamic_imbalance",
-    # "strlearn_sudden_drift",
-    # "strlearn_gradual_drift",
-    # "strlearn_static_imbalance",
-    # "strlearn_dynamic_imbalance",
+    "dynamic_overlaping",
+    "dynamic_imbalance",
+    "strlearn_sudden_drift",
+    "strlearn_gradual_drift",
+    "strlearn_static_imbalance",
+    "strlearn_dynamic_imbalance",
 ]
 
 ESTIMATORS = [
@@ -130,10 +129,11 @@ def eval_dataset(ds_name):
         ax.grid()
 
         plt.tight_layout()
-        plt.savefig(f"_eval/{ds_name}_CR{ratio:.2f}.png")
+        plt.savefig(f"_eval/{ds_name}_C{ratio:.3f}.png")
         plt.close()
 
-        np.save(f"_results/{ds_name}_CR{ratio:.2f}.npy", scores)
+        np.save(f"_results/{ds_name}_C{ratio:.3f}_scores.npy", scores)
+        np.save(f"_results/{ds_name}_C{ratio:.3f}_iterations.npy", iters)
 
 def main():
     jobs = []
