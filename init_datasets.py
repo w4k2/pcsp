@@ -68,13 +68,14 @@ def prepare_gif(X, y, ds_name):
     gif.export(f"{ds_name}.gif")
 
 real_datasets = [
-        'data/cse/kddcup99.arff',
-        'data/cse/powersupply.arff',
-        'data/cse/sensor.arff',
-        'data/moa/airlines.arff',
-        'data/moa/covtypeNorm.arff',
-        'data/moa/elecNormNew.arff',
-        'data/moa/rbf.arff',
+        'data/kdd/kddcup.data',
+        # 'data/cse/kddcup99.arff',
+        # 'data/cse/powersupply.arff',
+        # 'data/cse/sensor.arff',
+        # 'data/moa/airlines.arff',
+        # 'data/moa/covtypeNorm.arff',
+        # 'data/moa/elecNormNew.arff',
+        # 'data/moa/rbf.arff',
 ]
 
 concept_kwargs = {

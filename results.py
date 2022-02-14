@@ -46,9 +46,9 @@ for db_name in db_names:
     fig = plt.figure(figsize=(bw * 1.618, bw))
     grid = fig.add_gridspec(3, 1)
 
-    plt.title(db_name)
+    # plt.title(db_name)
 
-    for i, cr in enumerate([0.001, 0.005, 0.01]):
+    for i, cr in enumerate([0.01, 0.02, 0.05]):
         print(cr)
         scores = db_dict[cr]
 
@@ -60,9 +60,10 @@ for db_name in db_names:
         ax = fig.add_subplot(grid[i, :])
         ax.set_ylabel("Adjusted Rand Index")
         ax.set_xlabel("Chunks")
+        # ax.title.set_text(f'{cr}')
 
         for _ in scores:
-            plt.plot(_, ':', lw=1)
+            plt.plot(_, ':', lw=1, alpha=0.7)
 
         ax.set_prop_cycle(None)
 
@@ -75,9 +76,19 @@ for db_name in db_names:
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-    plt.legend(frameon=False, ncol=4)
+        ax2 = ax.twinx()
+        ax2.set_ylabel(f'Constrain Ratio: {cr:.2f}')
+        ax2.set_yticks([])
+        [ax2.spines[spine].set_visible(False) for spine in ax2.spines]
+
+        handles, labels = ax.get_legend_handles_labels()
+
+    fig.legend(handles, labels, loc='upper center', ncol=4, frameon=False)
     plt.tight_layout()
+    fig.subplots_adjust(top=0.92, bottom=.07)
+    # plt.legend(frameon=False, ncol=4)
     # plt.savefig("foo.png")
-    plt.savefig(f"foo_{db_name}.png")
+    plt.savefig(f"plots/{db_name}.eps")
+    plt.savefig("foo.png")
     plt.clf()
     plt.close()

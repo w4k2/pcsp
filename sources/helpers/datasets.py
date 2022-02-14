@@ -11,8 +11,11 @@ if not os.path.isdir(DEFAULT_DATASET_STORAGE):
 
 
 def load_arff_dataset(data_path):
-    data_record, meta = arff.loadarff(data_path)
-    data = pd.DataFrame(data_record)
+    if data_path.endswith('.arff'):
+        data_record, meta = arff.loadarff(data_path)
+        data = pd.DataFrame(data_record)
+    else:
+        data = pd.read_csv(data_path)
     return data.iloc[:, :-1], data.iloc[:, -1]
 
 
